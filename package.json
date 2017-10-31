@@ -1,6 +1,6 @@
 {
   "name": "xb-workflow",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "dependencies": {
     "autoprefixer": "^6.3.3",
     "babel-core": "^6.10.4",
@@ -72,5 +72,8 @@
     "url": "https://github.com/weixin/tmt-workflow"
   },
   "homepage": "https://github.com/weixin/tmt-workflow",
-  "readmeFilename": "README.md"
+  "readmeFilename": "README.md",
+  "devDependencies": {
+    "memory-fs": "^0.4.1"
+  }
 }
