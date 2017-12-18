@@ -13,28 +13,17 @@ var minifyCSS = require('gulp-cssnano');
 var imagemin = require('gulp-imagemin');
 var pngquant = require('imagemin-pngquant');
 // var tmtsprite = require('gulp-tmtsprite');   // 雪碧图合并
-var ejshelper = require('tmt-ejs-helper');
 var postcss = require('gulp-postcss');  // CSS 预处理
 var postcssPxtorem = require('postcss-pxtorem'); // 转换 px 为 rem
 var postcssAutoprefixer = require('autoprefixer');
-var posthtml = require('gulp-posthtml');
-var posthtmlPx2rem = require('posthtml-px2rem');
 var RevAll = require('gulp-rev-all');   // reversion
 var revDel = require('gulp-rev-delete-original');
 var sass = require('gulp-sass');
 var changed = require('./common/changed')();
 var webpack = require('webpack-stream');
 var babel = require('gulp-babel');
-
-//svg转换用到的组件
-var fs = require('fs');
-var rename = require('gulp-rename');
-var svgmin = require('gulp-svgmin');
-var svgInline = require('gulp-svg-inline');
-var replace = require('gulp-replace');
-var parseSVG = require('./common/parseSVG');
-var svgToPng = require('./common/svgToPng');
-var svgSymbol = require('gulp-svg-sprite');
+var inlinesource = require('gulp-inline-source'); // 内置css
+var xbtHelper = require('./lib/helper');
 
 var webpackConfigPath = path.join(process.cwd(), 'webpack.config.js');
 var webpackConfig; // webpack 配置
@@ -55,8 +44,7 @@ var paths = {
         sass: './src/css/style-*.scss',
         html: ['./src/html/**/*.html', '!./src/html/_*/**.html'],
         htmlAll: './src/html/**/*',
-        php: './src/**/*.php',
-        svg: './src/svg/**/*.svg'
+        php: './src/**/*.php'
     },
     tmp: {
         dir: './tmp',
@@ -64,16 +52,12 @@ var paths = {
         img: './tmp/img',
         html: './tmp/html',
         sprite: './tmp/sprite',
-        js: './tmp/js',
-        svg: './tmp/svg',
-        symboltemp:'./tmp/symboltemp/',
-        symbol:'./tmp/symbolsvg'
+        js: './tmp/js'
     },
     dist: {
         dir: './dist',
         css: './dist/css',
         img: './dist/img',
-        img: './dist/svg',
         html: './dist/html',
         sprite: './dist/sprite'
     }
@@ -82,7 +66,7 @@ var paths = {
 module.exports = function (gulp, config) {
     var webp = require('./common/webp')(config);
 
-    var lazyDir = config.lazyDir || ['../slice','../svg'];
+    var lazyDir = config.lazyDir || ['../slice'];
 
     var postcssOption = [];
 
@@ -90,7 +74,7 @@ module.exports = function (gulp, config) {
         postcssOption = [
             postcssAutoprefixer({browsers: ['last 5 versions']}),
             postcssPxtorem({
-                root_value: '20', // 基准值 html{ font-zise: 20px; }
+                root_value: '75', // 基准值 html{ font-zise: 20px; }
                 prop_white_list: [], // 对所有 px 值生效
                 minPixelValue: 2 // 忽略 1px 值
             })
@@ -111,15 +95,11 @@ module.exports = function (gulp, config) {
         return del([paths.tmp.dir]);
     }
 
-    function delSVG() {
-        return del([paths.tmp.symboltemp]);
-    }
-
     //编译 less
     function compileLess() {
         return gulp.src(paths.src.less)
             .pipe(less({relativeUrls: true}))
-            .pipe(lazyImageCSS({SVGGracefulDegradation:config.SVGGracefulDegradation,imagePath: lazyDir}))
+            .pipe(lazyImageCSS({imagePath: lazyDir}))
             // .pipe(tmtsprite({margin: 4}))
             .pipe(gulpif('*.png', gulp.dest(paths.tmp.sprite), gulp.dest(paths.tmp.css)));
     }
@@ -127,9 +107,11 @@ module.exports = function (gulp, config) {
     //编译 less
     function compileSass() {
         return gulp.src(paths.src.sass)
-            .pipe(sass())
+            .pipe(sass({
+                outputStyle: 'compressed'
+            }))
             .on('error', sass.logError)
-            .pipe(lazyImageCSS({SVGGracefulDegradation:config.SVGGracefulDegradation,imagePath: lazyDir}))
+            .pipe(lazyImageCSS({imagePath: lazyDir}))
             // .pipe(tmtsprite({margin: 4}))
             .pipe(gulpif('*.png', gulp.dest(paths.tmp.sprite), gulp.dest(paths.tmp.css)));
     }
@@ -137,10 +119,6 @@ module.exports = function (gulp, config) {
     //自动补全
     function compileAutoprefixer() {
         return gulp.src('./tmp/css/style-*.css')
-            .pipe(svgInline({
-                maxImageSize: 10*1024*1024,
-                extensions: [/.svg/ig],
-            }))
             .pipe(postcss(postcssOption))
             .pipe(gulp.dest('./tmp/css/'));
     }
@@ -200,20 +178,19 @@ module.exports = function (gulp, config) {
     //html 编译
     function compileHtml() {
         return gulp.src(paths.src.html)
-            .pipe(ejs(ejshelper()))
-            .pipe(gulpif(
-                config.supportREM,
-                posthtml(
-                    posthtmlPx2rem({
-                        rootValue: 20,
-                        minPixelValue: 2
-                    })
-                ))
-            )
-            .pipe(parseSVG({devPath:'tmp',SVGGracefulDegradation:config.SVGGracefulDegradation}))
+            .pipe(ejs(xbtHelper()))
             .pipe(gulp.dest(paths.tmp.html))
             .pipe(usemin())
-            .pipe(gulp.dest(paths.tmp.html));
+            .pipe(gulp.dest(paths.tmp.html));          
+    }
+
+    //单行样式脚本
+    function compileInlineSource() {
+        return gulp.src('./tmp/html/*.html')
+            .pipe(inlinesource({
+                compress: false
+            }))
+            .pipe(gulp.dest(paths.tmp.html));          
     }
 
 
@@ -260,89 +237,6 @@ module.exports = function (gulp, config) {
             cb();
         }
     }
-
-    function miniSVG() {
-        if(config.SVGGracefulDegradation){
-            return gulp.src(paths.src.svg)
-               .pipe(svgmin({
-                    plugins: [{ 
-                        convertPathData: true 
-                    }, {
-                        removeTitle: true
-                    }, {
-                        mergePaths: false 
-                    }, { 
-                        removeUnknownsAndDefaults: false 
-                    }, {
-                        removeDoctype: true
-                    }, {
-                        removeComments: true
-                    }, {
-                        cleanupNumericValues: {
-                            floatPrecision: 2
-                        }
-                    }, {
-                        convertColors: {
-                            names2hex: true,
-                            rgb2hex: true
-                        }
-                    }]
-                }))
-               .pipe(svgToPng())
-               .pipe(gulp.dest(paths.tmp.svg));
-        }else{
-            return gulp.src(paths.src.svg)
-               .pipe(svgmin({
-                    plugins: [{ 
-                        convertPathData: true 
-                    }, {
-                        removeTitle: true
-                    }, {
-                        mergePaths: false 
-                    }, { 
-                        removeUnknownsAndDefaults: false 
-                    }, {
-                        removeDoctype: true
-                    }, {
-                        removeComments: true
-                    }, {
-                        cleanupNumericValues: {
-                            floatPrecision: 2
-                        }
-                    }, {
-                        convertColors: {
-                            names2hex: true,
-                            rgb2hex: true
-                        }
-                    }]
-                }))
-               .pipe(gulp.dest(paths.tmp.svg));
-        }
-    }
-
-    function svgSymbols(){
-        return gulp.src(paths.tmp.symboltemp + '**/*.svg')
-            .pipe(svgSymbol({
-                mode:{
-                    inline:true,
-                    symbol:true
-                },
-                shape:{
-                    id:{
-                        generator:function(id){
-                            var ids = id.replace(/.svg/ig,'');
-                            return ids;
-                        }
-                    }
-                }
-            }))
-            .pipe(rename(function (path){
-                path.dirname = './';
-                path.basename = 'symbol';
-            }))
-            .pipe(gulp.dest(paths.tmp.symbol));
-    }
-
 
     function findChanged(cb) {
 
@@ -419,17 +313,15 @@ module.exports = function (gulp, config) {
             compileSass,
             imageminImg,
             copyMedia,
-            compileJs,
-            miniSVG
+            compileJs
         ),
         compileAutoprefixer,
         imageminSprite,
         miniCSS,
         compileHtml,
-        svgSymbols,
+        compileInlineSource,
         reversion,
         supportWebp(),
-        delSVG,
         findChanged,
         loadPlugin
     ));

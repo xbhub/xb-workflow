@@ -1,6 +1,6 @@
 {
   "name": "xb-workflow",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "dependencies": {
     "autoprefixer": "^6.3.3",
     "babel-core": "^6.10.4",
@@ -21,7 +21,6 @@
     "gulp-lazyimagecss": "^2.0.0",
     "gulp-less": "^3.0.5",
     "gulp-postcss": "^6.0.1",
-    "gulp-posthtml": "^1.5.2",
     "gulp-rename": "^1.2.2",
     "gulp-replace": "^0.5.4",
     "gulp-rev-all": "^0.8.22",
@@ -39,13 +38,12 @@
     "imagemin-pngquant": "^4.2.2",
     "lodash": "^4.5.1",
     "postcss-pxtorem": "^3.3.1",
-    "posthtml-px2rem": "^0.0.3",
     "quick-local-ip": "^1.0.7",
     "rc": "^1.1.6",
     "rd": "^0.0.2",
     "svg-to-png": "^3.1.2",
     "through2": "^2.0.3",
-    "tmt-ejs-helper": "^0.0.1",
+    "xbt-ejs-helper": "^0.0.3",
     "vinyl": "^2.0.1",
     "webpack": "^2.2.1",
     "webpack-stream": "^3.2.0"
